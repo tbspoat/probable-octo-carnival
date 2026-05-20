@@ -1,11 +1,21 @@
 package com.github.tbspoat.ff.client.module;
 
+import com.github.tbspoat.ff.client.module.impl.movement.Sprint;
+import com.github.tbspoat.ff.client.module.impl.movement.SprintReset;
+
 import java.util.ArrayList;
 import java.util.List;
 
 public class ModuleManager {
 
     private final List<Module> modules = new ArrayList<>();
+
+    public ModuleManager() {
+
+        // REGISTER MODULES HERE
+        add(new Sprint());
+        add(new SprintReset());
+    }
 
     public void add(Module m) {
         modules.add(m);
@@ -29,7 +39,9 @@ public class ModuleManager {
     }
 
     public void onTick() {
+
         for (Module m : modules) {
+
             if (m.isEnabled()) {
                 m.onTick();
             }

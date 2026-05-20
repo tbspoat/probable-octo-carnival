@@ -18,6 +18,7 @@ public class Sprint extends Module {
     public void onTick() {
         if (mc.thePlayer == null || mc.theWorld == null) return;
         if (!isEnabled()) return;
+        if (SprintReset.isCurrentlyResetting()) return;
 
         KeyBinding.setKeyBindState(mc.gameSettings.keyBindSprint.getKeyCode(), true);
     }
