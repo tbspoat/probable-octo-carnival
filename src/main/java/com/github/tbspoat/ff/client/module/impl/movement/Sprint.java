@@ -3,7 +3,8 @@ package com.github.tbspoat.ff.client.module.impl.movement;
 import com.github.tbspoat.ff.client.module.Module;
 import com.github.tbspoat.ff.client.module.ModuleCategory;
 import net.minecraft.client.Minecraft;
-import net.minecraft.potion.Potion;
+import net.minecraft.client.settings.KeyBinding;
+import org.lwjgl.input.Keyboard;
 
 public class Sprint extends Module {
 
@@ -18,24 +19,18 @@ public class Sprint extends Module {
         if (mc.thePlayer == null || mc.theWorld == null) return;
         if (!isEnabled()) return;
 
-        // Enhanced safe checks (adds Hunger and Blindness validation)
-        boolean canSprint = mc.thePlayer.movementInput.moveForward > 0 &&
-                !mc.thePlayer.isSneaking() &&
-                !mc.thePlayer.isCollidedHorizontally &&
-                mc.thePlayer.getFoodStats().getFoodLevel() > 6 &&
-                !mc.thePlayer.isPotionActive(Potion.blindness);
-
-        if (canSprint) {
-            mc.thePlayer.setSprinting(true);
-        } else {
-            mc.thePlayer.setSprinting(false);
-        }
+        KeyBinding.setKeyBindState(mc.gameSettings.keyBindSprint.getKeyCode(), true);
     }
 
     @Override
     public void onDisable() {
         if (mc.thePlayer != null) {
-            mc.thePlayer.setSprinting(false);
+            // Un-press the key, but check if the player is physically holding it down
+            // so we don't accidentally stop them if they are playing legitimately.
+            int sprintKeyCode = mc.gameSettings.keyBindSprint.getKeyCode();
+            boolean isPhysicallyHoldingKey = Keyboard.isKeyDown(sprintKeyCode);
+
+            KeyBinding.setKeyBindState(sprintKeyCode, isPhysicallyHoldingKey);
         }
     }
 }
