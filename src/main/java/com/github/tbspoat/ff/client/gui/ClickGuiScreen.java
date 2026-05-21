@@ -4,7 +4,6 @@ import com.github.tbspoat.ff.client.Client;
 import com.github.tbspoat.ff.client.module.Module;
 import com.github.tbspoat.ff.client.module.ModuleCategory;
 import com.github.tbspoat.ff.client.module.ModuleManager;
-import com.github.tbspoat.ff.client.module.impl.combat.AdvancedJumpReset;
 import com.github.tbspoat.ff.client.module.impl.movement.SprintReset;
 import net.minecraft.client.gui.Gui;
 import net.minecraft.client.gui.GuiScreen;
@@ -21,7 +20,7 @@ public class ClickGuiScreen extends GuiScreen {
     private int guiX;
     private int guiY;
     private final int guiWidth = 360;
-    private final int guiHeight = 250;
+    private final int guiHeight = 240;
     private final int sidebarWidth = 44;
 
     private int dragX;
@@ -86,7 +85,7 @@ public class ClickGuiScreen extends GuiScreen {
 
         int startX = guiX + sidebarWidth + 12;
         int startY = guiY + 38;
-        boolean showingSettings = hasSettings(settingsModule) &&
+        boolean showingSettings = settingsModule instanceof SprintReset &&
                 settingsModule.getCategory() == selectedCategory;
         int cardWidth = showingSettings ? 132 : 142;
         int cardHeight = 42;
@@ -108,12 +107,7 @@ public class ClickGuiScreen extends GuiScreen {
         }
 
         if (showingSettings) {
-            int settingsX = startX + cardWidth + gap;
-            if (settingsModule instanceof SprintReset) {
-                drawSprintResetSettings((SprintReset) settingsModule, settingsX, startY, 162, 174, mouseX, mouseY);
-            } else if (settingsModule instanceof AdvancedJumpReset) {
-                drawJumpResetSettings((AdvancedJumpReset) settingsModule, settingsX, startY, 162, 208, mouseX, mouseY);
-            }
+            drawSprintResetSettings((SprintReset) settingsModule, startX + cardWidth + gap, startY, 162, 192, mouseX, mouseY);
         }
     }
 
@@ -127,8 +121,8 @@ public class ClickGuiScreen extends GuiScreen {
 
         fontRendererObj.drawString(module.getName(), x + 9, y + 10, module.isEnabled() ? 0xFFFFF3ED : 0xFF7A7080);
         fontRendererObj.drawString(module.getCategory().name(), x + 9, y + 25, module.isEnabled() ? 0xFFFFA081 : 0xFF51485A);
-        if (hasSettings(module)) {
-            fontRendererObj.drawString("S", x + cardWidth - 43, y + 25, settingsModule == module ? 0xFFFF8D6A : 0xFF5F536C);
+        if (module instanceof SprintReset) {
+            fontRendererObj.drawString("R", x + cardWidth - 43, y + 25, settingsModule == module ? 0xFFFF8D6A : 0xFF5F536C);
         }
 
         int toggleX = x + cardWidth - 30;
@@ -157,28 +151,9 @@ public class ClickGuiScreen extends GuiScreen {
         rowY += 25;
         drawBooleanSetting("Forward Check", sprintReset.isCheckForwardMovement(), x + 9, rowY, width - 18);
         rowY += 18;
-        drawBooleanSetting("Debug Chat", sprintReset.isDebugMode(), x + 9, rowY, width - 18);
-    }
-
-    private void drawJumpResetSettings(AdvancedJumpReset jumpReset, int x, int y, int width, int height, int mouseX, int mouseY) {
-        drawBorderedRect(x, y, x + width, y + height, 0xCC140D1C, 0x66FF8D6A);
-        fontRendererObj.drawString("JumpReset", x + 9, y + 9, 0xFFFFF3ED);
-        fontRendererObj.drawString("settings", x + 9, y + 21, 0xFFFFA081);
-
-        int rowY = y + 40;
-        drawSlider("Min Delay", "jumpMinDelay", jumpReset.getMinTickDelay(), 0.0, 3.0, "t", x + 9, rowY, width - 18, mouseX, mouseY);
-        rowY += 22;
-        drawSlider("Max Delay", "jumpMaxDelay", jumpReset.getMaxTickDelay(), 0.0, 3.0, "t", x + 9, rowY, width - 18, mouseX, mouseY);
-        rowY += 22;
-        drawSlider("Jump Chance", "jumpChance", jumpReset.getJumpChancePercent(), 0.0, 100.0, "%", x + 9, rowY, width - 18, mouseX, mouseY);
-        rowY += 22;
-        drawSlider("Max Fall", "jumpMaxFall", jumpReset.getMaxFallDistanceAirRange(), 0.0, 1.0, "b", x + 9, rowY, width - 18, mouseX, mouseY);
-        rowY += 22;
-        drawSlider("Max Streak", "jumpMaxStreak", jumpReset.getMaxJumpsInARow(), 1.0, 10.0, "x", x + 9, rowY, width - 18, mouseX, mouseY);
-        rowY += 25;
-        drawBooleanSetting("Streak Limit", jumpReset.isStreakLimitEnabled(), x + 9, rowY, width - 18);
+        drawBooleanSetting("Server Confirm", sprintReset.isServerConfirmedHit(), x + 9, rowY, width - 18);
         rowY += 18;
-        drawBooleanSetting("Debug Chat", jumpReset.isDebugMode(), x + 9, rowY, width - 18);
+        drawBooleanSetting("Debug Chat", sprintReset.isDebugMode(), x + 9, rowY, width - 18);
     }
 
     private void drawSlider(String label, String id, double value, double min, double max, String suffix, int x, int y, int width, int mouseX, int mouseY) {
@@ -222,7 +197,7 @@ public class ClickGuiScreen extends GuiScreen {
         List<Module> modules = moduleManager.getModulesByCategory(selectedCategory);
         int startX = guiX + sidebarWidth + 12;
         int startY = guiY + 38;
-        boolean showingSettings = hasSettings(settingsModule) &&
+        boolean showingSettings = settingsModule instanceof SprintReset &&
                 settingsModule.getCategory() == selectedCategory;
         int cardWidth = showingSettings ? 132 : 142;
         int cardHeight = 42;
@@ -239,18 +214,14 @@ public class ClickGuiScreen extends GuiScreen {
             }
 
             if (mouseButton == 1 && isInside(mouseX, mouseY, x, y, x + cardWidth, y + cardHeight) &&
-                    hasSettings(modules.get(i))) {
+                    modules.get(i) instanceof SprintReset) {
                 settingsModule = settingsModule == modules.get(i) ? null : modules.get(i);
             }
         }
 
-        if (mouseButton == 0 && hasSettings(settingsModule) &&
+        if (mouseButton == 0 && settingsModule instanceof SprintReset &&
                 settingsModule.getCategory() == selectedCategory) {
-            if (settingsModule instanceof SprintReset) {
-                handleSprintResetSettingsClick((SprintReset) settingsModule, mouseX, mouseY);
-            } else if (settingsModule instanceof AdvancedJumpReset) {
-                handleJumpResetSettingsClick((AdvancedJumpReset) settingsModule, mouseX, mouseY);
-            }
+            handleSprintResetSettingsClick((SprintReset) settingsModule, mouseX, mouseY);
         }
 
         super.mouseClicked(mouseX, mouseY, mouseButton);
@@ -314,53 +285,12 @@ public class ClickGuiScreen extends GuiScreen {
         }
         rowY += 18;
         if (isInside(mouseX, mouseY, settingX, rowY, settingX + settingWidth, rowY + 14)) {
-            sprintReset.setDebugMode(!sprintReset.isDebugMode());
-        }
-    }
-
-    private void handleJumpResetSettingsClick(AdvancedJumpReset jumpReset, int mouseX, int mouseY) {
-        int startX = guiX + sidebarWidth + 12;
-        int startY = guiY + 38;
-        int cardWidth = 132;
-        int gap = 8;
-        int x = startX + cardWidth + gap;
-        int y = startY;
-        int settingX = x + 9;
-        int settingWidth = 144;
-        int rowY = y + 40;
-
-        if (clickSlider("jumpMinDelay", mouseX, mouseY, settingX, rowY, settingWidth)) {
-            applyDraggedSetting(jumpReset, mouseX);
-            return;
-        }
-        rowY += 22;
-        if (clickSlider("jumpMaxDelay", mouseX, mouseY, settingX, rowY, settingWidth)) {
-            applyDraggedSetting(jumpReset, mouseX);
-            return;
-        }
-        rowY += 22;
-        if (clickSlider("jumpChance", mouseX, mouseY, settingX, rowY, settingWidth)) {
-            applyDraggedSetting(jumpReset, mouseX);
-            return;
-        }
-        rowY += 22;
-        if (clickSlider("jumpMaxFall", mouseX, mouseY, settingX, rowY, settingWidth)) {
-            applyDraggedSetting(jumpReset, mouseX);
-            return;
-        }
-        rowY += 22;
-        if (clickSlider("jumpMaxStreak", mouseX, mouseY, settingX, rowY, settingWidth)) {
-            applyDraggedSetting(jumpReset, mouseX);
-            return;
-        }
-        rowY += 25;
-        if (isInside(mouseX, mouseY, settingX, rowY, settingX + settingWidth, rowY + 14)) {
-            jumpReset.setStreakLimitEnabled(!jumpReset.isStreakLimitEnabled());
+            sprintReset.setServerConfirmedHit(!sprintReset.isServerConfirmedHit());
             return;
         }
         rowY += 18;
         if (isInside(mouseX, mouseY, settingX, rowY, settingX + settingWidth, rowY + 14)) {
-            jumpReset.setDebugMode(!jumpReset.isDebugMode());
+            sprintReset.setDebugMode(!sprintReset.isDebugMode());
         }
     }
 
@@ -374,17 +304,13 @@ public class ClickGuiScreen extends GuiScreen {
     }
 
     private void updateDraggedSetting(int mouseX) {
-        if (draggingSetting == null || !hasSettings(settingsModule)) return;
+        if (draggingSetting == null || !(settingsModule instanceof SprintReset)) return;
         if (!Mouse.isButtonDown(0)) {
             draggingSetting = null;
             return;
         }
 
-        if (settingsModule instanceof SprintReset) {
-            applyDraggedSetting((SprintReset) settingsModule, mouseX);
-        } else if (settingsModule instanceof AdvancedJumpReset) {
-            applyDraggedSetting((AdvancedJumpReset) settingsModule, mouseX);
-        }
+        applyDraggedSetting((SprintReset) settingsModule, mouseX);
     }
 
     private void applyDraggedSetting(SprintReset sprintReset, int mouseX) {
@@ -405,24 +331,6 @@ public class ClickGuiScreen extends GuiScreen {
         }
     }
 
-    private void applyDraggedSetting(AdvancedJumpReset jumpReset, int mouseX) {
-        int startX = guiX + sidebarWidth + 12;
-        int settingX = startX + 132 + 8 + 9;
-        int settingWidth = 144;
-
-        if ("jumpMinDelay".equals(draggingSetting)) {
-            jumpReset.setMinTickDelay((int) Math.round(sliderValue(mouseX, settingX, settingWidth, 0.0, 3.0)));
-        } else if ("jumpMaxDelay".equals(draggingSetting)) {
-            jumpReset.setMaxTickDelay((int) Math.round(sliderValue(mouseX, settingX, settingWidth, 0.0, 3.0)));
-        } else if ("jumpChance".equals(draggingSetting)) {
-            jumpReset.setJumpChancePercent(sliderValue(mouseX, settingX, settingWidth, 0.0, 100.0));
-        } else if ("jumpMaxFall".equals(draggingSetting)) {
-            jumpReset.setMaxFallDistanceAirRange(sliderValue(mouseX, settingX, settingWidth, 0.0, 1.0));
-        } else if ("jumpMaxStreak".equals(draggingSetting)) {
-            jumpReset.setMaxJumpsInARow((int) Math.round(sliderValue(mouseX, settingX, settingWidth, 1.0, 10.0)));
-        }
-    }
-
     private double sliderValue(int mouseX, int x, int width, double min, double max) {
         double percent = (mouseX - x) / (double) width;
         percent = Math.max(0.0, Math.min(1.0, percent));
@@ -430,12 +338,8 @@ public class ClickGuiScreen extends GuiScreen {
     }
 
     private String formatValue(double value, String suffix) {
-        if ("ms".equals(suffix) || "t".equals(suffix) || "x".equals(suffix)) {
+        if ("ms".equals(suffix)) {
             return Math.round(value) + suffix;
-        }
-
-        if ("b".equals(suffix)) {
-            return String.format(Locale.US, "%.2f%s", value, suffix);
         }
 
         return String.format(Locale.US, "%.0f%s", value, suffix);
@@ -451,9 +355,5 @@ public class ClickGuiScreen extends GuiScreen {
 
     private boolean isInside(int mouseX, int mouseY, int left, int top, int right, int bottom) {
         return mouseX >= left && mouseX <= right && mouseY >= top && mouseY <= bottom;
-    }
-
-    private boolean hasSettings(Module module) {
-        return module instanceof SprintReset || module instanceof AdvancedJumpReset;
     }
 }

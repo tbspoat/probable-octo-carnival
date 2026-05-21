@@ -4,6 +4,7 @@ import com.github.tbspoat.ff.client.module.Module;
 import com.github.tbspoat.ff.client.module.ModuleCategory;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.settings.KeyBinding;
+import net.minecraft.entity.Entity;
 import net.minecraft.entity.EntityLivingBase;
 import net.minecraft.util.ChatComponentText;
 import net.minecraft.util.EnumChatFormatting;
@@ -36,6 +37,7 @@ public class SprintReset extends Module {
 
     // Setting 5: Toggleable Chat Debug Mode
     private boolean debugMode = true;
+    private boolean serverConfirmedHit = false;
 
     // ATTACK EVENT TRACKING
     private static final int MS_PER_TICK = 50;
@@ -45,6 +47,9 @@ public class SprintReset extends Module {
     // NOSTOP STATE ENGINE
     private int pendingResetTicks = -1;
     private int pendingNoStopRestartTicks = -1;
+    private int pendingConfirmedTargetId = -1;
+    private int pendingConfirmedTargetTicks = -1;
+    private String pendingConfirmedTargetName = "";
 
     // Global bridge state for your toggle-Sprint module
     public static boolean stopSprint = false;
@@ -65,7 +70,7 @@ public class SprintReset extends Module {
         if (mc.thePlayer == null || target == null || target.isDead || target.getHealth() <= 0) return;
         if (!mc.thePlayer.isSprinting()) return;
         if (triggerChancePercent <= 0.0) return;
-        if (pendingNoStopRestartTicks >= 0 || hitCooldownTicks > 0) return;
+        if (pendingResetTicks >= 0 || pendingNoStopRestartTicks >= 0 || hitCooldownTicks > 0) return;
 
         if (checkForwardMovement && mc.thePlayer.movementInput.moveForward <= 0) {
             sendDebugMessage(EnumChatFormatting.RED + "[NoStop] Cancelled: Not moving forward.");
@@ -78,10 +83,11 @@ public class SprintReset extends Module {
             return;
         }
 
-        if (pendingResetTicks >= 0) {
-            pendingResetTicks = -1;
-            sendDebugMessage(EnumChatFormatting.YELLOW + "[NoStop] Pending delay overridden by new hit.");
-            triggerNoStopReset();
+        if (serverConfirmedHit) {
+            pendingConfirmedTargetId = target.getEntityId();
+            pendingConfirmedTargetTicks = 8;
+            pendingConfirmedTargetName = target.getName();
+            sendDebugMessage(EnumChatFormatting.YELLOW + "[NoStop] Waiting for server-confirmed damage on: " + pendingConfirmedTargetName);
             return;
         }
 
@@ -100,6 +106,10 @@ public class SprintReset extends Module {
 
         if (hitCooldownTicks > 0) {
             hitCooldownTicks--;
+        }
+
+        if (pendingConfirmedTargetTicks >= 0) {
+            checkServerConfirmedHit();
         }
 
         if (pendingResetTicks >= 0) {
@@ -186,8 +196,39 @@ public class SprintReset extends Module {
         }
         pendingResetTicks = -1;
         pendingNoStopRestartTicks = -1;
+        pendingConfirmedTargetId = -1;
+        pendingConfirmedTargetTicks = -1;
+        pendingConfirmedTargetName = "";
         hitCooldownTicks = 0;
         stopSprint = false;
+    }
+
+    private void checkServerConfirmedHit() {
+        if (pendingConfirmedTargetTicks-- <= 0) {
+            sendDebugMessage(EnumChatFormatting.RED + "[NoStop] Cancelled: Server-confirmed damage was not detected.");
+            clearServerConfirmedHit();
+            return;
+        }
+
+        Entity entity = mc.theWorld.getEntityByID(pendingConfirmedTargetId);
+        if (!(entity instanceof EntityLivingBase)) {
+            sendDebugMessage(EnumChatFormatting.RED + "[NoStop] Cancelled: Confirm target disappeared.");
+            clearServerConfirmedHit();
+            return;
+        }
+
+        EntityLivingBase target = (EntityLivingBase) entity;
+        if (target.hurtTime > 0) {
+            String targetName = pendingConfirmedTargetName;
+            clearServerConfirmedHit();
+            scheduleNoStopReset(targetName);
+        }
+    }
+
+    private void clearServerConfirmedHit() {
+        pendingConfirmedTargetId = -1;
+        pendingConfirmedTargetTicks = -1;
+        pendingConfirmedTargetName = "";
     }
 
     // =========================================================================
@@ -214,4 +255,7 @@ public class SprintReset extends Module {
 
     public void setDebugMode(boolean enabled) { this.debugMode = enabled; }
     public boolean isDebugMode() { return this.debugMode; }
+
+    public void setServerConfirmedHit(boolean enabled) { this.serverConfirmedHit = enabled; }
+    public boolean isServerConfirmedHit() { return this.serverConfirmedHit; }
 }
