@@ -139,13 +139,13 @@ public class ClickGuiScreen extends GuiScreen {
         fontRendererObj.drawString("settings", x + 9, y + 21, 0xFFFFA081);
 
         int rowY = y + 40;
-        drawSlider("Delay", "delay", sprintReset.getDelayAfterHitMs(), 0.0, 250.0, "ms", x + 9, rowY, width - 18, mouseX, mouseY);
+        drawSlider("Delay", "delay", sprintReset.getDelayUntilResetMs(), 0.0, 250.0, "ms", x + 9, rowY, width - 18, mouseX, mouseY);
         rowY += 22;
-        drawSlider("Delay Dev", "delayDev", sprintReset.getDelayAfterHitDeviationMs(), 0.0, 100.0, "ms", x + 9, rowY, width - 18, mouseX, mouseY);
+        drawSlider("Delay Dev", "delayDev", sprintReset.getDelayUntilResetDeviationMs(), 0.0, 100.0, "ms", x + 9, rowY, width - 18, mouseX, mouseY);
         rowY += 22;
-        drawSlider("Unsprint", "unsprint", sprintReset.getTimeSpentUnprintedMs(), 10.0, 500.0, "ms", x + 9, rowY, width - 18, mouseX, mouseY);
+        drawSlider("Restart", "unsprint", sprintReset.getNoStopBaseRestartMs(), 10.0, 500.0, "ms", x + 9, rowY, width - 18, mouseX, mouseY);
         rowY += 22;
-        drawSlider("Unsprint Dev", "unsprintDev", sprintReset.getTimeSpentUnprintedDeviationMs(), 0.0, 200.0, "ms", x + 9, rowY, width - 18, mouseX, mouseY);
+        drawSlider("Restart Dev", "unsprintDev", sprintReset.getNoStopRestartDeviationMs(), 0.0, 200.0, "ms", x + 9, rowY, width - 18, mouseX, mouseY);
         rowY += 22;
         drawSlider("Chance", "chance", sprintReset.getTriggerChancePercent(), 0.0, 100.0, "%", x + 9, rowY, width - 18, mouseX, mouseY);
         rowY += 25;
@@ -312,13 +312,13 @@ public class ClickGuiScreen extends GuiScreen {
         int settingWidth = 144;
 
         if ("delay".equals(draggingSetting)) {
-            sprintReset.setDelayAfterHitMs(Math.round(sliderValue(mouseX, settingX, settingWidth, 0.0, 250.0)));
+            sprintReset.setDelayUntilResetMs(Math.round(sliderValue(mouseX, settingX, settingWidth, 0.0, 250.0)));
         } else if ("delayDev".equals(draggingSetting)) {
-            sprintReset.setDelayAfterHitDeviationMs(sliderValue(mouseX, settingX, settingWidth, 0.0, 100.0));
+            sprintReset.setDelayUntilResetDeviationMs(sliderValue(mouseX, settingX, settingWidth, 0.0, 100.0));
         } else if ("unsprint".equals(draggingSetting)) {
-            sprintReset.setTimeSpentUnprintedMs(Math.round(sliderValue(mouseX, settingX, settingWidth, 10.0, 500.0)));
+            sprintReset.setNoStopBaseRestartMs(Math.round(sliderValue(mouseX, settingX, settingWidth, 10.0, 500.0)));
         } else if ("unsprintDev".equals(draggingSetting)) {
-            sprintReset.setTimeSpentUnprintedDeviationMs(sliderValue(mouseX, settingX, settingWidth, 0.0, 200.0));
+            sprintReset.setNoStopRestartDeviationMs(sliderValue(mouseX, settingX, settingWidth, 0.0, 200.0));
         } else if ("chance".equals(draggingSetting)) {
             sprintReset.setTriggerChancePercent(sliderValue(mouseX, settingX, settingWidth, 0.0, 100.0));
         }

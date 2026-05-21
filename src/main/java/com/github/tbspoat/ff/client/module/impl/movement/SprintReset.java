@@ -4,11 +4,10 @@ import com.github.tbspoat.ff.client.module.Module;
 import com.github.tbspoat.ff.client.module.ModuleCategory;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.settings.KeyBinding;
-import net.minecraft.entity.Entity;
 import net.minecraft.entity.EntityLivingBase;
 import net.minecraft.util.ChatComponentText;
 import net.minecraft.util.EnumChatFormatting;
-import net.minecraft.util.MovingObjectPosition;
+import org.lwjgl.input.Keyboard;
 
 import java.util.Random;
 
@@ -17,19 +16,19 @@ public class SprintReset extends Module {
     private final Minecraft mc = Minecraft.getMinecraft();
     private final Random random = new Random();
 
-    // ==========================================
+    // =========================================================================
     // CONFIGURABLE VALUES
-    // ==========================================
+    // =========================================================================
 
-    // Setting 1: Delay after landing a hit before dropping sprint (Mean and Deviation)
-    private long delayAfterHitMs = 20L;
-    private double delayAfterHitDeviationMs = 5.0;
+    // Setting 1: Delay after landing a hit before starting the NoStop sequence
+    private long delayUntilResetMs = 90L;
+    private double delayUntilResetDeviationMs = 10.0; // Gaussian variation (+/- ms)
 
-    // Setting 2: How long to stay unsprinted before turning it back on (Mean and Deviation)
-    private long timeSpentUnprintedMs = 100L;
-    private double timeSpentUnprintedDeviationMs = 15.0;
+    // Setting 2: The base restart delay (Keystrokes uses 24ms base + random 0-12ms variance)
+    private long noStopBaseRestartMs = 24L;
+    private double noStopRestartDeviationMs = 4.0; // Gaussian variation (+/- ms)
 
-    // Setting 3: Check if the player is actively pressing W/moving forward
+    // Setting 3: Check if the player is actively moving forward
     private boolean checkForwardMovement = true;
 
     // Setting 4: The percent chance that the sprint reset triggers on a hit (0.0 to 100.0)
@@ -38,156 +37,123 @@ public class SprintReset extends Module {
     // Setting 5: Toggleable Chat Debug Mode
     private boolean debugMode = true;
 
-    // HIT DETECTION INTERNAL STATE
-    private EntityLivingBase lastTarget;
-    private int lastHurtTime;
-    private long lastHitTime;
-    private static final long HIT_COOLDOWN_MS = 50L;
+    // ATTACK EVENT TRACKING
+    private static final int MS_PER_TICK = 50;
+    private static final int HIT_COOLDOWN_TICKS = 6; // 300ms at normal 20 TPS
+    private int hitCooldownTicks = 0;
 
-    // SPRINT RESET INTERNAL STATE
-    private boolean resetting = false;
-    private long disableSprintAt = 0L;
-    private long enableSprintAt = 0L;
+    // NOSTOP STATE ENGINE
+    private int pendingResetTicks = -1;
+    private int pendingNoStopRestartTicks = -1;
 
-    // COMPATIBILITY BRIDGE: Allows the Sprint module to read our active reset state
-    private static boolean currentlyResetting = false;
+    // Global bridge state for your toggle-Sprint module
+    public static boolean stopSprint = false;
 
     public SprintReset() {
         super("SprintReset", ModuleCategory.MOVEMENT);
     }
 
+    /**
+     * Compatibility Bridge: Informs your global Sprint module to stop overriding
+     * keybind states while the NoStop sequence is actively processing.
+     */
     public static boolean isCurrentlyResetting() {
-        return currentlyResetting;
+        return stopSprint;
     }
 
     public void onAttack(EntityLivingBase target) {
         if (mc.thePlayer == null || target == null || target.isDead || target.getHealth() <= 0) return;
-        if (resetting) return;
-
-        long now = System.currentTimeMillis();
-        if (now - lastHitTime < HIT_COOLDOWN_MS) return;
+        if (!mc.thePlayer.isSprinting()) return;
+        if (triggerChancePercent <= 0.0) return;
+        if (pendingResetTicks >= 0 || pendingNoStopRestartTicks >= 0 || hitCooldownTicks > 0) return;
 
         if (checkForwardMovement && mc.thePlayer.movementInput.moveForward <= 0) {
-            sendDebugMessage(EnumChatFormatting.RED + "[SprintReset] Cancelled: Player is not moving forward.");
+            sendDebugMessage(EnumChatFormatting.RED + "[NoStop] Cancelled: Not moving forward.");
             return;
         }
 
         double roll = random.nextDouble() * 100.0;
         if (roll > triggerChancePercent) {
-            sendDebugMessage(EnumChatFormatting.RED + String.format("[SprintReset] Cancelled: Failed chance roll (Rolled %.1f%% / Needed <= %.1f%%)", roll, triggerChancePercent));
+            sendDebugMessage(EnumChatFormatting.RED + String.format("[NoStop] Cancelled: Failed roll (Rolled %.1f%% / Needed <= %.1f%%)", roll, triggerChancePercent));
             return;
         }
 
-        lastHitTime = now;
-        sendDebugMessage(EnumChatFormatting.GREEN + "[AttackHandler] Confirmed Attack on: " + target.getName());
-        triggerResetSequence(now);
+        scheduleNoStopReset(target.getName());
     }
 
     @Override
     public void onTick() {
         if (!isEnabled()) return;
-        if (mc.thePlayer == null || mc.theWorld == null) {
-            resetHitTracking();
+
+        // Safety Cleanups
+        if (mc.thePlayer == null || mc.theWorld == null || mc.thePlayer.isDead) {
             cleanupResetState();
             return;
         }
 
-        if (resetting) {
-            long now = System.currentTimeMillis();
+        if (hitCooldownTicks > 0) {
+            hitCooldownTicks--;
+        }
 
-            // PHASE 1: The "Sprint Off" Window
-            if (now >= disableSprintAt && now < enableSprintAt) {
-                currentlyResetting = true;
+        if (pendingResetTicks >= 0) {
+            if (pendingResetTicks == 0) {
+                pendingResetTicks = -1;
+                triggerNoStopReset();
+            } else {
+                pendingResetTicks--;
+            }
+        }
 
-                mc.thePlayer.setSprinting(false);
-                KeyBinding.setKeyBindState(mc.gameSettings.keyBindSprint.getKeyCode(), false);
+        if (stopSprint && pendingNoStopRestartTicks >= 0) {
+            mc.thePlayer.setSprinting(false);
+            KeyBinding.setKeyBindState(mc.gameSettings.keyBindSprint.getKeyCode(), false);
+        }
+
+        if (pendingNoStopRestartTicks >= 0) {
+            if (pendingNoStopRestartTicks > 0) {
+                pendingNoStopRestartTicks--;
+                return;
             }
 
-            // PHASE 2: The "Sprint On" Milestone
-            if (now >= enableSprintAt) {
-                currentlyResetting = false;
+            pendingNoStopRestartTicks = -1;
+            stopSprint = false;
+            hitCooldownTicks = HIT_COOLDOWN_TICKS;
 
-                // Re-sprint safely if moving forward
-                if (mc.thePlayer.movementInput.moveForward > 0 && !mc.thePlayer.isCollidedHorizontally) {
-                    mc.thePlayer.setSprinting(true);
-                    KeyBinding.setKeyBindState(mc.gameSettings.keyBindSprint.getKeyCode(), true);
-                }
-
-                resetting = false;
+            if ((mc.thePlayer.movementInput.moveForward != 0.0F || mc.thePlayer.movementInput.moveStrafe != 0.0F)
+                    && !mc.gameSettings.keyBindSneak.isKeyDown()) {
+                mc.thePlayer.setSprinting(true);
             }
+
+            sendDebugMessage(EnumChatFormatting.GOLD + "[NoStop] Sprint Re-engaged successfully.");
         }
     }
 
-    private void runHitDetector() {
-        MovingObjectPosition mop = mc.objectMouseOver;
-        if (mop == null || mop.entityHit == null) {
-            resetTargetTracking();
-            return;
-        }
+    private void scheduleNoStopReset(String targetName) {
+        if (pendingResetTicks >= 0 || pendingNoStopRestartTicks >= 0) return;
 
-        Entity entity = mop.entityHit;
-        if (!(entity instanceof EntityLivingBase)) {
-            resetTargetTracking();
-            return;
-        }
+        long calculatedDelayUntilReset = Math.max(0L, Math.round(delayUntilResetMs + (random.nextGaussian() * delayUntilResetDeviationMs)));
+        pendingResetTicks = msToTicks(calculatedDelayUntilReset);
 
-        EntityLivingBase target = (EntityLivingBase) entity;
-        if (target.isDead || target.getHealth() <= 0) {
-            resetTargetTracking();
-            return;
-        }
-
-        if (lastTarget != target) {
-            lastTarget = target;
-            lastHurtTime = target.hurtTime;
-            return;
-        }
-
-        boolean freshDamage = target.hurtTime > 0 && target.hurtTime > lastHurtTime;
-
-        if (freshDamage) {
-            long now = System.currentTimeMillis();
-            if (now - lastHitTime >= HIT_COOLDOWN_MS) {
-                lastHitTime = now;
-
-                sendDebugMessage(EnumChatFormatting.GREEN + "[HitDetector] Confirmed Hit on: " + target.getName());
-
-                // NEW CHECK 1: Ensure forward movement if the configuration is enabled
-                if (checkForwardMovement && mc.thePlayer.movementInput.moveForward <= 0) {
-                    sendDebugMessage(EnumChatFormatting.RED + "[SprintReset] Cancelled: Player is not moving forward.");
-                    lastHurtTime = target.hurtTime;
-                    return;
-                }
-
-                // NEW CHECK 2: Trigger chance validation (random value between 0.0 and 100.0)
-                double roll = random.nextDouble() * 100.0;
-                if (roll > triggerChancePercent) {
-                    sendDebugMessage(EnumChatFormatting.RED + String.format("[SprintReset] Cancelled: Failed chance roll (Rolled %.1f%% / Needed <= %.1f%%)", roll, triggerChancePercent));
-                    lastHurtTime = target.hurtTime;
-                    return;
-                }
-
-                triggerResetSequence(now);
-            }
-        }
-
-        lastHurtTime = target.hurtTime;
+        sendDebugMessage(EnumChatFormatting.GREEN + "[NoStop] Confirmed Hit on: " + targetName);
+        sendDebugMessage(EnumChatFormatting.AQUA + "[NoStop] Scheduled Break in: " + pendingResetTicks + " tick(s) (" + calculatedDelayUntilReset + "ms configured)");
     }
 
-    private void triggerResetSequence(long currentTimeMs) {
-        resetting = true;
+    /**
+     * Executes the direct NoStop sprint reset.
+     */
+    private void triggerNoStopReset() {
+        stopSprint = true;
+        mc.thePlayer.setSprinting(false);
+        KeyBinding.setKeyBindState(mc.gameSettings.keyBindSprint.getKeyCode(), false);
 
-        // Calculate Gaussian randomized offsets
-        long calculatedDelayAfterHit = Math.max(0L, Math.round(delayAfterHitMs + (random.nextGaussian() * delayAfterHitDeviationMs)));
-        long calculatedUnprintedTime = Math.max(10L, Math.round(timeSpentUnprintedMs + (random.nextGaussian() * timeSpentUnprintedDeviationMs)));
+        long calculatedRestartDelay = Math.max(1L, Math.round(noStopBaseRestartMs + (random.nextGaussian() * noStopRestartDeviationMs)));
+        pendingNoStopRestartTicks = Math.max(1, msToTicks(calculatedRestartDelay));
 
-        // Set the exact system time milestones using our randomized durations
-        disableSprintAt = currentTimeMs + calculatedDelayAfterHit;
-        enableSprintAt = disableSprintAt + calculatedUnprintedTime;
+        sendDebugMessage(EnumChatFormatting.LIGHT_PURPLE + "[NoStop] Sprint break applied for " + pendingNoStopRestartTicks + " tick(s) (" + calculatedRestartDelay + "ms configured)");
+    }
 
-        // Print final chosen calculations to client chat
-        sendDebugMessage(EnumChatFormatting.AQUA + "[SprintReset] Scheduled: Drop Sprint in "
-                + calculatedDelayAfterHit + "ms | Keep off for " + calculatedUnprintedTime + "ms");
+    private int msToTicks(long ms) {
+        return (int) Math.ceil(ms / (double) MS_PER_TICK);
     }
 
     private void sendDebugMessage(String message) {
@@ -197,41 +163,41 @@ public class SprintReset extends Module {
     }
 
     @Override
-    public void onDisable() {
-        resetHitTracking();
+    public void onEnable() {
         cleanupResetState();
     }
 
-    private void resetTargetTracking() {
-        lastTarget = null;
-        lastHurtTime = 0;
-    }
-
-    private void resetHitTracking() {
-        resetTargetTracking();
-        lastHitTime = 0L;
+    @Override
+    public void onDisable() {
+        cleanupResetState();
     }
 
     private void cleanupResetState() {
-        resetting = false;
-        currentlyResetting = false;
+        if (mc.gameSettings != null) {
+            KeyBinding.setKeyBindState(mc.gameSettings.keyBindSprint.getKeyCode(),
+                    Keyboard.isKeyDown(mc.gameSettings.keyBindSprint.getKeyCode()));
+        }
+        pendingResetTicks = -1;
+        pendingNoStopRestartTicks = -1;
+        hitCooldownTicks = 0;
+        stopSprint = false;
     }
 
-    // ==========================================
+    // =========================================================================
     // GETTERS & SETTERS FOR YOUR CONFIG SYSTEM
-    // ==========================================
+    // =========================================================================
 
-    public void setDelayAfterHitMs(long ms) { this.delayAfterHitMs = ms; }
-    public long getDelayAfterHitMs() { return this.delayAfterHitMs; }
+    public void setDelayUntilResetMs(long ms) { this.delayUntilResetMs = ms; }
+    public long getDelayUntilResetMs() { return this.delayUntilResetMs; }
 
-    public void setDelayAfterHitDeviationMs(double ms) { this.delayAfterHitDeviationMs = ms; }
-    public double getDelayAfterHitDeviationMs() { return this.delayAfterHitDeviationMs; }
+    public void setDelayUntilResetDeviationMs(double ms) { this.delayUntilResetDeviationMs = ms; }
+    public double getDelayUntilResetDeviationMs() { return this.delayUntilResetDeviationMs; }
 
-    public void setTimeSpentUnprintedMs(long ms) { this.timeSpentUnprintedMs = ms; }
-    public long getTimeSpentUnprintedMs() { return this.timeSpentUnprintedMs; }
+    public long getNoStopBaseRestartMs() { return noStopBaseRestartMs; }
+    public void setNoStopBaseRestartMs(long ms) { this.noStopBaseRestartMs = ms; }
 
-    public void setTimeSpentUnprintedDeviationMs(double ms) { this.timeSpentUnprintedDeviationMs = ms; }
-    public double getTimeSpentUnprintedDeviationMs() { return this.timeSpentUnprintedDeviationMs; }
+    public double getNoStopRestartDeviationMs() { return noStopRestartDeviationMs; }
+    public void setNoStopRestartDeviationMs(double ms) { this.noStopRestartDeviationMs = ms; }
 
     public void setCheckForwardMovement(boolean check) { this.checkForwardMovement = check; }
     public boolean isCheckForwardMovement() { return this.checkForwardMovement; }
