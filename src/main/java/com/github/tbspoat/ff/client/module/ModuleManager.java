@@ -2,6 +2,7 @@ package com.github.tbspoat.ff.client.module;
 
 import com.github.tbspoat.ff.client.module.impl.movement.Sprint;
 import com.github.tbspoat.ff.client.module.impl.movement.SprintReset;
+import com.github.tbspoat.ff.client.module.impl.combat.AdvancedJumpReset;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -13,6 +14,7 @@ public class ModuleManager {
     public ModuleManager() {
 
         // REGISTER MODULES HERE
+        add(new AdvancedJumpReset());
         add(new Sprint());
         add(new SprintReset());
     }

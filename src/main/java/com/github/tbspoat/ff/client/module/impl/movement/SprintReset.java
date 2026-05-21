@@ -65,7 +65,7 @@ public class SprintReset extends Module {
         if (mc.thePlayer == null || target == null || target.isDead || target.getHealth() <= 0) return;
         if (!mc.thePlayer.isSprinting()) return;
         if (triggerChancePercent <= 0.0) return;
-        if (pendingResetTicks >= 0 || pendingNoStopRestartTicks >= 0 || hitCooldownTicks > 0) return;
+        if (pendingNoStopRestartTicks >= 0 || hitCooldownTicks > 0) return;
 
         if (checkForwardMovement && mc.thePlayer.movementInput.moveForward <= 0) {
             sendDebugMessage(EnumChatFormatting.RED + "[NoStop] Cancelled: Not moving forward.");
@@ -75,6 +75,13 @@ public class SprintReset extends Module {
         double roll = random.nextDouble() * 100.0;
         if (roll > triggerChancePercent) {
             sendDebugMessage(EnumChatFormatting.RED + String.format("[NoStop] Cancelled: Failed roll (Rolled %.1f%% / Needed <= %.1f%%)", roll, triggerChancePercent));
+            return;
+        }
+
+        if (pendingResetTicks >= 0) {
+            pendingResetTicks = -1;
+            sendDebugMessage(EnumChatFormatting.YELLOW + "[NoStop] Pending delay overridden by new hit.");
+            triggerNoStopReset();
             return;
         }
 
