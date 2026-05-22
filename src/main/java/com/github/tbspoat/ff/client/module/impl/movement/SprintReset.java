@@ -49,7 +49,11 @@ public class SprintReset extends Module {
     private int pendingNoStopRestartTicks = -1;
     private int pendingConfirmedTargetId = -1;
     private int pendingConfirmedTargetTicks = -1;
+    private int pendingConfirmedStartHurtTime = 0;
     private String pendingConfirmedTargetName = "";
+    private boolean serverConfirmArmed = false;
+    private boolean serverConfirmConsumed = false;
+    private int sprintResetCount = 0;
 
     // Global bridge state for your toggle-Sprint module
     public static boolean stopSprint = false;
@@ -84,8 +88,16 @@ public class SprintReset extends Module {
         }
 
         if (serverConfirmedHit) {
+            if (serverConfirmArmed) {
+                sendDebugMessage(EnumChatFormatting.RED + "[NoStop] Cancelled: Already waiting for server-confirmed damage.");
+                return;
+            }
+
+            serverConfirmArmed = true;
+            serverConfirmConsumed = false;
             pendingConfirmedTargetId = target.getEntityId();
             pendingConfirmedTargetTicks = 8;
+            pendingConfirmedStartHurtTime = target.hurtTime;
             pendingConfirmedTargetName = target.getName();
             sendDebugMessage(EnumChatFormatting.YELLOW + "[NoStop] Waiting for server-confirmed damage on: " + pendingConfirmedTargetName);
             return;
@@ -162,11 +174,12 @@ public class SprintReset extends Module {
         stopSprint = true;
         mc.thePlayer.setSprinting(false);
         KeyBinding.setKeyBindState(mc.gameSettings.keyBindSprint.getKeyCode(), false);
+        sprintResetCount++;
 
         long calculatedRestartDelay = Math.max(1L, Math.round(noStopBaseRestartMs + (random.nextGaussian() * noStopRestartDeviationMs)));
         pendingNoStopRestartTicks = Math.max(1, msToTicks(calculatedRestartDelay));
 
-        sendDebugMessage(EnumChatFormatting.LIGHT_PURPLE + "[NoStop] Sprint break applied for " + pendingNoStopRestartTicks + " tick(s) (" + calculatedRestartDelay + "ms configured)");
+        sendDebugMessage(EnumChatFormatting.LIGHT_PURPLE + "[NoStop] #" + sprintResetCount + " Sprint break applied for " + pendingNoStopRestartTicks + " tick(s) (" + calculatedRestartDelay + "ms configured)");
     }
 
     private int msToTicks(long ms) {
@@ -198,7 +211,10 @@ public class SprintReset extends Module {
         pendingNoStopRestartTicks = -1;
         pendingConfirmedTargetId = -1;
         pendingConfirmedTargetTicks = -1;
+        pendingConfirmedStartHurtTime = 0;
         pendingConfirmedTargetName = "";
+        serverConfirmArmed = false;
+        serverConfirmConsumed = false;
         hitCooldownTicks = 0;
         stopSprint = false;
     }
@@ -206,6 +222,14 @@ public class SprintReset extends Module {
     private void checkServerConfirmedHit() {
         if (pendingConfirmedTargetTicks-- <= 0) {
             sendDebugMessage(EnumChatFormatting.RED + "[NoStop] Cancelled: Server-confirmed damage was not detected.");
+            serverConfirmArmed = false;
+            serverConfirmConsumed = false;
+            clearServerConfirmedHit();
+            return;
+        }
+
+        if (!serverConfirmArmed || serverConfirmConsumed) {
+            serverConfirmArmed = false;
             clearServerConfirmedHit();
             return;
         }
@@ -213,13 +237,17 @@ public class SprintReset extends Module {
         Entity entity = mc.theWorld.getEntityByID(pendingConfirmedTargetId);
         if (!(entity instanceof EntityLivingBase)) {
             sendDebugMessage(EnumChatFormatting.RED + "[NoStop] Cancelled: Confirm target disappeared.");
+            serverConfirmArmed = false;
+            serverConfirmConsumed = false;
             clearServerConfirmedHit();
             return;
         }
 
         EntityLivingBase target = (EntityLivingBase) entity;
-        if (target.hurtTime > 0) {
+        if (target.hurtTime > pendingConfirmedStartHurtTime) {
             String targetName = pendingConfirmedTargetName;
+            serverConfirmArmed = false;
+            serverConfirmConsumed = true;
             clearServerConfirmedHit();
             scheduleNoStopReset(targetName);
         }
@@ -228,6 +256,7 @@ public class SprintReset extends Module {
     private void clearServerConfirmedHit() {
         pendingConfirmedTargetId = -1;
         pendingConfirmedTargetTicks = -1;
+        pendingConfirmedStartHurtTime = 0;
         pendingConfirmedTargetName = "";
     }
 
