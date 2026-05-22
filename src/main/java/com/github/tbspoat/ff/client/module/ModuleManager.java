@@ -2,36 +2,29 @@ package com.github.tbspoat.ff.client.module;
 
 import com.github.tbspoat.ff.client.module.impl.movement.Sprint;
 import com.github.tbspoat.ff.client.module.impl.movement.SprintReset;
-import com.github.tbspoat.ff.client.module.impl.combat.AdvancedJumpReset;
-
 import java.util.ArrayList;
 import java.util.List;
 
 public class ModuleManager {
-
-    private final List<Module> modules = new ArrayList<>();
+    private final List<Module> modules = new ArrayList();
 
     public ModuleManager() {
-
-        // REGISTER MODULES HERE
-        add(new AdvancedJumpReset());
-        add(new Sprint());
-        add(new SprintReset());
+        this.add(new Sprint());
+        this.add(new SprintReset());
     }
 
     public void add(Module m) {
-        modules.add(m);
+        this.modules.add(m);
     }
 
     public List<Module> getModules() {
-        return modules;
+        return this.modules;
     }
 
     public List<Module> getModulesByCategory(ModuleCategory category) {
+        List<Module> out = new ArrayList();
 
-        List<Module> out = new ArrayList<>();
-
-        for (Module m : modules) {
+        for(Module m : this.modules) {
             if (m.getCategory() == category) {
                 out.add(m);
             }
@@ -41,12 +34,11 @@ public class ModuleManager {
     }
 
     public void onTick() {
-
-        for (Module m : modules) {
-
+        for(Module m : this.modules) {
             if (m.isEnabled()) {
                 m.onTick();
             }
         }
+
     }
 }
