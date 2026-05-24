@@ -1,7 +1,7 @@
 package com.github.tbspoat.ff.client.module;
 
 import com.github.tbspoat.ff.client.module.impl.movement.Sprint;
-import com.github.tbspoat.ff.client.module.impl.movement.SprintReset;
+
 import java.util.ArrayList;
 import java.util.List;
 
@@ -10,7 +10,6 @@ public class ModuleManager {
 
     public ModuleManager() {
         this.add(new Sprint());
-        this.add(new SprintReset());
     }
 
     public void add(Module m) {
@@ -19,6 +18,16 @@ public class ModuleManager {
 
     public List<Module> getModules() {
         return this.modules;
+    }
+
+    public <T extends Module> T getModule(Class<T> moduleClass) {
+        for (Module m : this.modules) {
+            if (moduleClass.isInstance(m)) {
+                return moduleClass.cast(m);
+            }
+        }
+
+        return null;
     }
 
     public List<Module> getModulesByCategory(ModuleCategory category) {

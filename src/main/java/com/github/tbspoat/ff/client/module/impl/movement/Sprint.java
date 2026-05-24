@@ -3,35 +3,38 @@ package com.github.tbspoat.ff.client.module.impl.movement;
 import com.github.tbspoat.ff.client.module.Module;
 import com.github.tbspoat.ff.client.module.ModuleCategory;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.settings.KeyBinding;
-import org.lwjgl.input.Keyboard;
+import net.minecraft.client.entity.EntityPlayerSP;
+import net.minecraft.potion.Potion;
 
 public class Sprint extends Module {
-
-    private final Minecraft mc = Minecraft.getMinecraft();
 
     public Sprint() {
         super("Sprint", ModuleCategory.MOVEMENT);
     }
 
     @Override
-    public void onTick() {
-        if (mc.thePlayer == null || mc.theWorld == null) return;
-        if (!isEnabled()) return;
-        if (SprintReset.isCurrentlyResetting()) return;
+    public void onDisable() {
+        Minecraft mc = Minecraft.getMinecraft();
+        EntityPlayerSP player = mc.thePlayer;
 
-        KeyBinding.setKeyBindState(mc.gameSettings.keyBindSprint.getKeyCode(), true);
+        // If the module is turned off, simply let vanilla regain total control.
+        // We only force a stop if they aren't holding down their actual sprint key.
+        if (player != null && player.isSprinting() && !mc.gameSettings.keyBindSprint.isKeyDown()) {
+            player.setSprinting(false);
+        }
     }
 
-    @Override
-    public void onDisable() {
-        if (mc.thePlayer != null) {
-            // Un-press the key, but check if the player is physically holding it down
-            // so we don't accidentally stop them if they are playing legitimately.
-            int sprintKeyCode = mc.gameSettings.keyBindSprint.getKeyCode();
-            boolean isPhysicallyHoldingKey = Keyboard.isKeyDown(sprintKeyCode);
-
-            KeyBinding.setKeyBindState(sprintKeyCode, isPhysicallyHoldingKey);
-        }
+    public static boolean canSprint(EntityPlayerSP player) {
+        return player.movementInput != null
+                && player.movementInput.moveForward > 0.0F
+                && !player.isSprinting()
+                && !player.isSneaking()
+                && !player.isUsingItem()
+                && !player.isPotionActive(Potion.blindness)
+                && !player.isCollidedHorizontally
+                // Added check: If they are actively flying, let vanilla handle movement speed
+                // so creative/spectator flight doesn't glitch out.
+                && !player.capabilities.isFlying
+                && (player.getFoodStats().getFoodLevel() > 6 || player.capabilities.allowFlying);
     }
 }

@@ -4,7 +4,6 @@ import com.github.tbspoat.ff.client.Client;
 import com.github.tbspoat.ff.client.module.Module;
 import com.github.tbspoat.ff.client.module.ModuleCategory;
 import com.github.tbspoat.ff.client.module.ModuleManager;
-import com.github.tbspoat.ff.client.module.impl.movement.SprintReset;
 import net.minecraft.client.gui.Gui;
 import net.minecraft.client.gui.GuiScreen;
 import net.minecraft.client.gui.ScaledResolution;
@@ -28,8 +27,6 @@ public class ClickGuiScreen extends GuiScreen {
     private int dragY;
     private boolean dragging;
     private ModuleCategory selectedCategory = ModuleCategory.MOVEMENT;
-    private Module settingsModule;
-    private String draggingSetting;
     private int contentScroll;
     private boolean draggingScrollbar;
 
@@ -52,7 +49,6 @@ public class ClickGuiScreen extends GuiScreen {
         drawSidebar(mouseX, mouseY);
         updateScrollbarDrag(mouseY);
         updateContentScroll(mouseX, mouseY);
-        updateDraggedSetting(mouseX);
         drawModules(mouseX, mouseY);
 
         super.drawScreen(mouseX, mouseY, partialTicks);
@@ -100,8 +96,6 @@ public class ClickGuiScreen extends GuiScreen {
         int startX = guiX + sidebarWidth + 14;
         contentScroll = clampInt(contentScroll, 0, getMaxContentScroll());
         int startY = guiY + 48 - contentScroll;
-        boolean showingSettings = settingsModule instanceof SprintReset &&
-                settingsModule.getCategory() == selectedCategory;
         int cardWidth = 170;
         int cardHeight = 40;
         int gap = 10;
@@ -111,8 +105,6 @@ public class ClickGuiScreen extends GuiScreen {
             return;
         }
 
-        int settingsX = -1;
-        int settingsY = -1;
         enableContentScissor();
         for (int i = 0; i < modules.size(); i++) {
             Module module = modules.get(i);
@@ -121,22 +113,14 @@ public class ClickGuiScreen extends GuiScreen {
             int x = startX + column * (cardWidth + gap);
             int y = startY + row * (cardHeight + gap);
 
-            boolean expanded = module == settingsModule && module instanceof SprintReset;
-            drawModuleCard(module, x, y, cardWidth, cardHeight, mouseX, mouseY, expanded);
-            if (module == settingsModule) {
-                settingsX = x;
-                settingsY = y + cardHeight;
-            }
+            drawModuleCard(module, x, y, cardWidth, cardHeight, mouseX, mouseY);
         }
 
-        if (showingSettings) {
-            drawSprintResetSettings((SprintReset) settingsModule, settingsX, settingsY, 170, 326, mouseX, mouseY);
-        }
         disableContentScissor();
         drawContentScrollbar();
     }
 
-    private void drawModuleCard(Module module, int x, int y, int cardWidth, int cardHeight, int mouseX, int mouseY, boolean expanded) {
+    private void drawModuleCard(Module module, int x, int y, int cardWidth, int cardHeight, int mouseX, int mouseY) {
         if (y + cardHeight < guiY + 44 || y > guiY + guiHeight - 12) {
             return;
         }
@@ -150,17 +134,10 @@ public class ClickGuiScreen extends GuiScreen {
         } else if (hovered) {
             drawCardGlow(x, y, x + cardWidth, y + cardHeight);
         }
-        if (expanded) {
-            drawAttachedHeaderRect(x, y, x + cardWidth, y + cardHeight, background, border);
-        } else {
-            drawBorderedRect(x, y, x + cardWidth, y + cardHeight, background, border);
-        }
+        drawBorderedRect(x, y, x + cardWidth, y + cardHeight, background, border);
         drawGradientRect(x + 1, y + 1, x + cardWidth - 1, y + cardHeight - 1,
                 module.isEnabled() ? 0x55351A24 : hovered ? 0x22181222 : 0x18100D17,
                 module.isEnabled() ? 0x22181218 : 0x11110D19);
-        if (expanded) {
-            Gui.drawRect(x + 1, y + cardHeight - 3, x + cardWidth - 1, y + cardHeight, background);
-        }
 
         int toggleX = x + cardWidth - 32;
         int toggleY = y + (cardHeight / 2) - 5;
@@ -171,77 +148,6 @@ public class ClickGuiScreen extends GuiScreen {
         drawRoundedRect(module.isEnabled() ? toggleX + 12 : toggleX + 2, toggleY + 2,
                 module.isEnabled() ? toggleX + 19 : toggleX + 9, toggleY + 9,
                 module.isEnabled() ? 0xFFFF8D6A : 0xFF403747);
-    }
-
-    private void drawSprintResetSettings(SprintReset sprintReset, int x, int y, int width, int height, int mouseX, int mouseY) {
-        boolean active = sprintReset.isEnabled();
-        int border = active ? 0xAAFF8D6A : 0x332A2230;
-        int fill = active ? 0xCC140D1C : 0xAA110D19;
-        drawAttachedPanelFill(x, y, x + width, y + height, fill);
-        Gui.drawRect(x + 1, y, x + width - 1, y + 36, fill);
-        drawGradientRect(x + 3, y + 36, x + width - 3, y + 304,
-                active ? 0x22271522 : 0x18120F18,
-                active ? 0x11110D19 : 0x110F0C14);
-        Gui.drawRect(x + 1, y + 304, x + width - 1, y + height, fill);
-        drawAttachedPanelOutline(x, y, x + width, y + height, border);
-        int rowY = y + 8;
-        int contentLeft = x + 10;
-        int contentWidth = width - 26;
-        drawSlider("Delay", "delay", sprintReset.getDelayUntilResetMs(), 0.0, 250.0, "ms", contentLeft, rowY, contentWidth, mouseX, mouseY, active);
-        rowY += 46;
-        drawSlider("Delay Dev", "delayDev", sprintReset.getDelayUntilResetDeviationMs(), 0.0, 100.0, "ms", contentLeft, rowY, contentWidth, mouseX, mouseY, active);
-        rowY += 46;
-        drawSlider("Restart", "unsprint", sprintReset.getNoStopBaseRestartMs(), 10.0, 500.0, "ms", contentLeft, rowY, contentWidth, mouseX, mouseY, active);
-        rowY += 46;
-        drawSlider("Restart Dev", "unsprintDev", sprintReset.getNoStopRestartDeviationMs(), 0.0, 200.0, "ms", contentLeft, rowY, contentWidth, mouseX, mouseY, active);
-        rowY += 46;
-        drawSlider("Chance", "chance", sprintReset.getTriggerChancePercent(), 0.0, 100.0, "%", contentLeft, rowY, contentWidth, mouseX, mouseY, active);
-        rowY += 50;
-        drawBooleanSetting("Forward Check", sprintReset.isCheckForwardMovement(), contentLeft, rowY, contentWidth, active);
-        rowY += 24;
-        drawBooleanSetting("Server Confirm", sprintReset.isServerConfirmedHit(), contentLeft, rowY, contentWidth, active);
-        rowY += 24;
-        drawBooleanSetting("Debug Chat", sprintReset.isDebugMode(), contentLeft, rowY, contentWidth, active);
-    }
-
-    private void drawSlider(String label, String id, double value, double min, double max, String suffix, int x, int y, int width, int mouseX, int mouseY, boolean active) {
-        if (!isVisibleSettingsRow(y, 42)) {
-            return;
-        }
-
-        double percent = Math.max(0.0, Math.min(1.0, (value - min) / (max - min)));
-        int textY = y + 2;
-        int barY = y + 31;
-        int fillRight = x + (int) Math.round(width * percent);
-        boolean hovered = isInside(mouseX, mouseY, x, y, x + width, y + 42);
-        int labelColor = active && (hovered || id.equals(draggingSetting)) ? 0xFFFFF3ED : active ? 0xFFB7AABF : 0xFF827789;
-        int valueColor = active ? 0xFFFF8D6A : 0xFF8B7F92;
-        int fillColor = active ? 0xFFFF8D6A : 0xFF6D6074;
-        int knobColor = active ? 0xFFFFB09A : 0xFF91849A;
-        String formattedValue = formatValue(value, suffix);
-
-        drawTextScaled(label, x, textY, labelColor, 1.1F);
-        drawTextScaled(formattedValue, x + width - getTextWidthScaled(formattedValue, 1.1F), textY, valueColor, 1.1F);
-        drawRoundedRect(x, barY, x + width, barY + 4, 0x77433145);
-        drawRoundedRect(x, barY, fillRight, barY + 4, fillColor);
-        drawRoundedRect(fillRight - 2, barY - 2, fillRight + 3, barY + 6, knobColor);
-    }
-
-    private void drawBooleanSetting(String label, boolean enabled, int x, int y, int width, boolean active) {
-        if (!isVisibleSettingsRow(y, 16)) {
-            return;
-        }
-
-        int toggleX = x + width - 24;
-        int toggleY = y + 2;
-        int toggleHeight = 12;
-        int labelY = toggleY + ((toggleHeight - getTextHeightScaled(1.1F)) / 2);
-        drawTextScaled(label, x, labelY, active ? 0xFFB7AABF : 0xFF827789, 1.1F);
-        drawRoundedRect(toggleX, toggleY, toggleX + 24, toggleY + toggleHeight,
-                active && enabled ? 0x995D302C : 0x66231E2B);
-        drawRoundedRect(enabled ? toggleX + 14 : toggleX + 3, toggleY + 3,
-                enabled ? toggleX + 21 : toggleX + 10, toggleY + 9,
-                active && enabled ? 0xFFFF8D6A : 0xFF5E5367);
     }
 
     @Override
@@ -283,15 +189,6 @@ public class ClickGuiScreen extends GuiScreen {
                 modules.get(i).toggle();
             }
 
-            if (mouseButton == 1 && isInsideContentViewport(mouseX, mouseY) && isInside(mouseX, mouseY, x, y, x + cardWidth, y + cardHeight) &&
-                    modules.get(i) instanceof SprintReset) {
-                settingsModule = settingsModule == modules.get(i) ? null : modules.get(i);
-            }
-        }
-
-        if (mouseButton == 0 && settingsModule instanceof SprintReset &&
-                settingsModule.getCategory() == selectedCategory && isInsideContentViewport(mouseX, mouseY)) {
-            handleSprintResetSettingsClick((SprintReset) settingsModule, mouseX, mouseY);
         }
 
         super.mouseClicked(mouseX, mouseY, mouseButton);
@@ -301,7 +198,6 @@ public class ClickGuiScreen extends GuiScreen {
     protected void mouseReleased(int mouseX, int mouseY, int state) {
         if (state == 0) {
             dragging = false;
-            draggingSetting = null;
             draggingScrollbar = false;
         }
         super.mouseReleased(mouseX, mouseY, state);
@@ -310,106 +206,7 @@ public class ClickGuiScreen extends GuiScreen {
     @Override
     public void onGuiClosed() {
         dragging = false;
-        draggingSetting = null;
         draggingScrollbar = false;
-        settingsModule = null;
-    }
-
-    private void handleSprintResetSettingsClick(SprintReset sprintReset, int mouseX, int mouseY) {
-        int x = getSettingsPanelX();
-        int y = getSettingsPanelY();
-        int settingX = x + 10;
-        int settingWidth = 144;
-        int rowY = y + 8;
-
-        if (clickSlider("delay", mouseX, mouseY, settingX, rowY, settingWidth)) {
-            applyDraggedSetting(sprintReset, mouseX);
-            return;
-        }
-        rowY += 46;
-        if (clickSlider("delayDev", mouseX, mouseY, settingX, rowY, settingWidth)) {
-            applyDraggedSetting(sprintReset, mouseX);
-            return;
-        }
-        rowY += 46;
-        if (clickSlider("unsprint", mouseX, mouseY, settingX, rowY, settingWidth)) {
-            applyDraggedSetting(sprintReset, mouseX);
-            return;
-        }
-        rowY += 46;
-        if (clickSlider("unsprintDev", mouseX, mouseY, settingX, rowY, settingWidth)) {
-            applyDraggedSetting(sprintReset, mouseX);
-            return;
-        }
-        rowY += 46;
-        if (clickSlider("chance", mouseX, mouseY, settingX, rowY, settingWidth)) {
-            applyDraggedSetting(sprintReset, mouseX);
-            return;
-        }
-        rowY += 50;
-        if (isInside(mouseX, mouseY, settingX, rowY, settingX + settingWidth, rowY + 14)) {
-            sprintReset.setCheckForwardMovement(!sprintReset.isCheckForwardMovement());
-            return;
-        }
-        rowY += 24;
-        if (isInside(mouseX, mouseY, settingX, rowY, settingX + settingWidth, rowY + 14)) {
-            sprintReset.setServerConfirmedHit(!sprintReset.isServerConfirmedHit());
-            return;
-        }
-        rowY += 24;
-        if (isInside(mouseX, mouseY, settingX, rowY, settingX + settingWidth, rowY + 14)) {
-            sprintReset.setDebugMode(!sprintReset.isDebugMode());
-        }
-    }
-
-    private boolean clickSlider(String id, int mouseX, int mouseY, int x, int y, int width) {
-        if (!isInside(mouseX, mouseY, x, y, x + width, y + 42)) {
-            return false;
-        }
-
-        draggingSetting = id;
-        return true;
-    }
-
-    private void updateDraggedSetting(int mouseX) {
-        if (draggingSetting == null || !(settingsModule instanceof SprintReset)) return;
-        if (!Mouse.isButtonDown(0)) {
-            draggingSetting = null;
-            return;
-        }
-
-        applyDraggedSetting((SprintReset) settingsModule, mouseX);
-    }
-
-    private void applyDraggedSetting(SprintReset sprintReset, int mouseX) {
-        int settingX = getSettingsPanelX() + 10;
-        int settingWidth = 144;
-
-        if ("delay".equals(draggingSetting)) {
-            sprintReset.setDelayUntilResetMs(Math.round(sliderValue(mouseX, settingX, settingWidth, 0.0, 250.0)));
-        } else if ("delayDev".equals(draggingSetting)) {
-            sprintReset.setDelayUntilResetDeviationMs(sliderValue(mouseX, settingX, settingWidth, 0.0, 100.0));
-        } else if ("unsprint".equals(draggingSetting)) {
-            sprintReset.setNoStopBaseRestartMs(Math.round(sliderValue(mouseX, settingX, settingWidth, 10.0, 500.0)));
-        } else if ("unsprintDev".equals(draggingSetting)) {
-            sprintReset.setNoStopRestartDeviationMs(sliderValue(mouseX, settingX, settingWidth, 0.0, 200.0));
-        } else if ("chance".equals(draggingSetting)) {
-            sprintReset.setTriggerChancePercent(sliderValue(mouseX, settingX, settingWidth, 0.0, 100.0));
-        }
-    }
-
-    private double sliderValue(int mouseX, int x, int width, double min, double max) {
-        double percent = (mouseX - x) / (double) width;
-        percent = Math.max(0.0, Math.min(1.0, percent));
-        return min + ((max - min) * percent);
-    }
-
-    private String formatValue(double value, String suffix) {
-        if ("ms".equals(suffix)) {
-            return Math.round(value) + suffix;
-        }
-
-        return String.format(Locale.US, "%.0f%s", value, suffix);
     }
 
     private String formatCategoryName(ModuleCategory category) {
@@ -420,32 +217,6 @@ public class ClickGuiScreen extends GuiScreen {
     private void drawBorderedRect(int left, int top, int right, int bottom, int fillColor, int borderColor) {
         drawRoundedRect(left, top, right, bottom, borderColor);
         drawRoundedRect(left + 1, top + 1, right - 1, bottom - 1, fillColor);
-    }
-
-    private void drawAttachedPanelFill(int left, int top, int right, int bottom, int fillColor) {
-        Gui.drawRect(left, top, right, bottom, fillColor);
-    }
-
-    private void drawAttachedPanelOutline(int left, int top, int right, int bottom, int borderColor) {
-        Gui.drawRect(left, top, left + 1, bottom - 3, borderColor);
-        Gui.drawRect(right - 1, top, right, bottom - 3, borderColor);
-        drawRoundedBottomOutline(left, right, bottom, borderColor);
-    }
-
-    private void drawAttachedHeaderRect(int left, int top, int right, int bottom, int fillColor, int borderColor) {
-        drawRoundedRect(left, top, right, bottom, borderColor);
-        drawRoundedRect(left + 1, top + 1, right - 1, bottom, fillColor);
-        Gui.drawRect(left + 1, bottom - 4, right - 1, bottom, fillColor);
-        Gui.drawRect(left, top + 3, left + 1, bottom + 1, borderColor);
-        Gui.drawRect(right - 1, top + 3, right, bottom + 1, borderColor);
-    }
-
-    private void drawRoundedBottomOutline(int left, int right, int bottom, int color) {
-        Gui.drawRect(left, bottom - 3, left + 1, bottom - 1, color);
-        Gui.drawRect(left + 1, bottom - 2, left + 3, bottom - 1, color);
-        Gui.drawRect(left + 3, bottom - 1, right - 3, bottom, color);
-        Gui.drawRect(right - 3, bottom - 2, right - 1, bottom - 1, color);
-        Gui.drawRect(right - 1, bottom - 3, right, bottom - 1, color);
     }
 
     private void drawText(String text, int x, int y, int color) {
@@ -459,20 +230,8 @@ public class ClickGuiScreen extends GuiScreen {
         GL11.glPopMatrix();
     }
 
-    private int getTextWidth(String text) {
-        return mc.fontRendererObj.getStringWidth(text);
-    }
-
-    private int getTextWidthScaled(String text, float scale) {
-        return Math.round(getTextWidth(text) * scale);
-    }
-
     private int getTextHeight() {
         return mc.fontRendererObj.FONT_HEIGHT;
-    }
-
-    private int getTextHeightScaled(float scale) {
-        return Math.round(getTextHeight() * scale);
     }
 
     private void drawRoundedRect(int left, int top, int right, int bottom, int color) {
@@ -577,11 +336,7 @@ public class ClickGuiScreen extends GuiScreen {
     private int getContentHeight() {
         List<Module> modules = moduleManager.getModulesByCategory(selectedCategory);
         int rows = Math.max(1, (modules.size() + 1) / 2);
-        int height = rows * (40 + 10);
-        if (settingsModule instanceof SprintReset && settingsModule.getCategory() == selectedCategory) {
-            height += 326;
-        }
-        return height + 12;
+        return rows * (40 + 10) + 12;
     }
 
     private int getContentViewportHeight() {
@@ -590,10 +345,6 @@ public class ClickGuiScreen extends GuiScreen {
 
     private int getMaxContentScroll() {
         return Math.max(0, getContentHeight() - getContentViewportHeight());
-    }
-
-    private boolean isVisibleSettingsRow(int rowY, int rowHeight) {
-        return rowY + rowHeight >= guiY + 44 && rowY <= guiY + guiHeight - 12;
     }
 
     private boolean isInsideContentViewport(int mouseX, int mouseY) {
@@ -666,36 +417,6 @@ public class ClickGuiScreen extends GuiScreen {
             Gui.drawRect(x + 2, y + 8, x + 5, y + 11, color);
             Gui.drawRect(x, y + 10, x + 3, y + 13, color);
         }
-    }
-
-    private int getSettingsPanelX() {
-        return getSettingsModuleCardX();
-    }
-
-    private int getSettingsPanelY() {
-        return getSettingsModuleCardY() + 40;
-    }
-
-    private int getSettingsModuleCardX() {
-        List<Module> modules = moduleManager.getModulesByCategory(selectedCategory);
-        int index = modules.indexOf(settingsModule);
-        if (index < 0) {
-            index = 0;
-        }
-
-        int column = index % 2;
-        return guiX + sidebarWidth + 14 + column * (170 + 10);
-    }
-
-    private int getSettingsModuleCardY() {
-        List<Module> modules = moduleManager.getModulesByCategory(selectedCategory);
-        int index = modules.indexOf(settingsModule);
-        if (index < 0) {
-            index = 0;
-        }
-
-        int row = index / 2;
-        return guiY + 48 - contentScroll + row * (40 + 10);
     }
 
     private boolean isInside(int mouseX, int mouseY, int left, int top, int right, int bottom) {
