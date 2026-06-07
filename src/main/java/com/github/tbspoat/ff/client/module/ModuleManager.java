@@ -1,5 +1,7 @@
 package com.github.tbspoat.ff.client.module;
 
+import com.github.tbspoat.ff.client.module.impl.misc.Fixes;
+import com.github.tbspoat.ff.client.module.impl.movement.SaveMoveKeys;
 import com.github.tbspoat.ff.client.module.impl.movement.Sprint;
 
 import java.util.ArrayList;
@@ -10,6 +12,8 @@ public class ModuleManager {
 
     public ModuleManager() {
         this.add(new Sprint());
+        this.add(new SaveMoveKeys());
+        this.add(new Fixes());
     }
 
     public void add(Module m) {

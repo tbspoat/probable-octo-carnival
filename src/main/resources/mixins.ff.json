@@ -1,13 +1,15 @@
 {
   "required": true,
-  "package": "${basePackage}.mixin",
-  "refmap": "mixins.${modid}.refmap.json",
+  "package": "com.github.tbspoat.ff.mixin",
+  "refmap": "mixins.ff.refmap.json",
   "minVersion": "0.7",
   "compatibilityLevel": "JAVA_8",
   "mixins": [],
   "client": [
     "MixinGuiMainMenu",
-    "client.entity.MixinEntityPlayerSP"
+    "client.MixinEntityLivingBase",
+    "client.MixinEntityPlayerSP",
+    "client.MixinMinecraft"
   ],
   "injectors": {
     "defaultRequire": 1
