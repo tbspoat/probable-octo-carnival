@@ -14,10 +14,11 @@ public class MixinMinecraft {
 
     @Shadow private int leftClickCounter;
 
-    @Inject(method = "clickMouse", at = @At("HEAD"))
-    private void clickMouseHead(CallbackInfo ci) {
+    @Inject(method = "clickMouse", at = @At("RETURN"))
+    private void clickMouseReturn(CallbackInfo ci) {
         Fixes fixes = Client.INSTANCE.moduleManager.getModule(Fixes.class);
 
+        // Safely set the delay back to 0 at the absolute end of the frame sequence
         if (fixes != null && fixes.isEnabled() && fixes.isNoHitDelay()) {
             this.leftClickCounter = 0;
         }
