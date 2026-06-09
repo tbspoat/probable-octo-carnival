@@ -1,5 +1,6 @@
 package com.github.tbspoat.ff.client.module;
 
+import com.github.tbspoat.ff.client.module.impl.combat.SprintReset;
 import com.github.tbspoat.ff.client.module.impl.misc.Fixes;
 import com.github.tbspoat.ff.client.module.impl.movement.SaveMoveKeys;
 import com.github.tbspoat.ff.client.module.impl.movement.Sprint;
@@ -14,6 +15,7 @@ public class ModuleManager {
         this.add(new Sprint());
         this.add(new SaveMoveKeys());
         this.add(new Fixes());
+        this.add(new SprintReset());
     }
 
     public void add(Module m) {

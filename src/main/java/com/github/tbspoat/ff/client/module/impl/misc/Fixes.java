@@ -55,8 +55,7 @@ public class Fixes extends Module {
             return;
         }
 
-        if (player.rotationYaw != player.prevRotationYaw ||
-                player.rotationPitch != player.prevRotationPitch) {
+        if (player.rotationYaw != player.prevRotationYaw || player.rotationPitch != player.prevRotationPitch) {
             player.prevRenderYawOffset = player.renderYawOffset;
             player.prevRotationYawHead = player.rotationYawHead;
             player.prevRotationYaw = player.rotationYaw;

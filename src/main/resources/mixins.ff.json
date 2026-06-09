@@ -8,8 +8,10 @@
   "client": [
     "MixinGuiMainMenu",
     "client.MixinEntityLivingBase",
-    "client.MixinEntityPlayerSP",
-    "client.MixinMinecraft"
+    "client.MixinMinecraft",
+    "client.MixinNetHandlerPlayClient",
+    "client.C02PacketUseEntityAccessor",
+    "client.S19PacketEntityStatusAccessor"
   ],
   "injectors": {
     "defaultRequire": 1
